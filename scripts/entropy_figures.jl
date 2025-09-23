@@ -111,5 +111,5 @@ name, _, _, H, h, η, β, γ, _, _ = default_initialisation()
 sim_f = (η; symmetrize=false) -> simulate(H, η; symmetrize=symmetrize, tspan=(0.0, 5.), saveat=0.05)
 trajectories = generate_homotopy(η, sim_f, Dyson.renyi_entropy; steps=100)
 
-create_heatmap(trajectories; T_max = 0.25, filename=joinpath(FIGURE_DIR, "entropy_heatmap_$(name).pdf"))
-create_entropies_figure(H, η, sim_f, γ, filename=joinpath(FIGURE_DIR, "entropy_graphs_$(name).pdf"))
+create_heatmap(trajectories; T_max = 0.25, filename=joinpath(FIGURE_DIR, "$(name)_entropy_heatmap.pdf"))
+create_entropies_figure(H, η, sim_f, γ, filename=joinpath(FIGURE_DIR, "$(name)_entropy_graphs.pdf"))

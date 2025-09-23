@@ -118,8 +118,8 @@ name, _, A, _, _, _, _, γ, incl_disease_free, errors = default_initialisation()
 kmax = length(errors)
 
 ratios, props, entropies, vars, ϕ_entropies, ηs = generate_transition_data(A; γ, β_range=(-2.1:0.0125:1.8), kmax, incl_disease_free)
-JLD2.@save joinpath(@__DIR__, "..", "results", "intermediate", "transition_points_$(name).jld2") ratios, props, entropies, vars, ϕ_entropies, ηs
-JLD2.@load joinpath(@__DIR__, "..", "results", "intermediate", "transition_points_$(name).jld2")
+output_file = joinpath(@__DIR__, "..", "results", "intermediate", "transition_points_" * name * ".jld2")
+JLD2.@save output_file ratios props entropies vars ϕ_entropies ηs
+JLD2.@load output_file ratios props entropies vars ϕ_entropies ηs
 plot_transition_data(ratios, props, entropies, vars, ϕ_entropies;
-                     marker_step=12, plot_size=(450, 270), output_file="transition_$(name).pdf")
-
+                     marker_step=12, plot_size=(450, 270), output_file=joinpath(FIGURE_DIR, "$(name)_transition.pdf"))
