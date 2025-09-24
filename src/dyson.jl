@@ -9,6 +9,7 @@ using Graphs
 using JLD2
 
 export default_initialisation
+export default_initial_condition
 export get_SIS_H
 export find_hermitian
 export simulate
@@ -261,7 +262,19 @@ function find_hermitian(H ; tol = 1e-8, kmax = 2500, verbose=false)
 end
 
 """
-    simulate(H, η=I; symmetrize=false, tspan=(0.,25.), saveat=0.1)
+    default_initial_condition(H, η)
+
+Default initial condition for simulations: a state vector of zeros with a unit
+mass in index 2 (one infected individual), transformed by `η`.
+"""
+function SIS_initial_state(n)
+    initial_state = zeros(n)
+    initial_state[2] = 1.0
+    return initial_state
+end
+
+"""
+    simulate(H, η=I; symmetrize=false, tspan=(0.,25.), saveat=0.1, initial_condition=default_initial_condition)
 
 Simulate the model given by `H` using a similarity-transformed matrix.
 # Arguments
@@ -270,14 +283,13 @@ Simulate the model given by `H` using a similarity-transformed matrix.
 - `symmetrize::Bool`: Whether to symmetrize the transformed matrix (default: false)
 - `tspan::Tuple{Float64, Float64}`: Time span for the simulation (default: (0.0, 25.0))
 - `saveat::Float64`: Time step for saving results (default: 0.1)
+- `initial_condition`: Function `(H, η) -> Vector` producing the initial state (default: `default_initial_condition`)
 # Returns
 - `ODESolution`: Solution of the ODE problem representing the SIS dynamics
 """
-function simulate(H, η=I; symmetrize=false, tspan=(0.,25.), saveat=0.1)
-    # Initial state: all susceptible
-    initial_state = zeros(size(H, 1))
-    initial_state[2] = 1.0  # Start with one infected individual
-    initial_state = η * initial_state  # Apply the similarity transformation
+function simulate(H, η=I; symmetrize=false, tspan=(0.,25.), saveat=0.1, initial_func=SIS_initial_state)
+    initial_state = initial_func(size(H, 1))
+    initial_state = η * initial_state
 
     f(du, u, p, t) = (du .= -1 * p[1] * u)
     H_prime = η * H * inv(η)
