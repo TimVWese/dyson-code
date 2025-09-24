@@ -8,6 +8,7 @@ The `scripts/` folder contains script that use this functionality to generate th
 Run `run_all.sh` as a bash script to initialise the Julia project and run all scripts.
 The resulting figures can be found under `results/figures`.
 To test other set-ups, the `default_initialisation()` function in `src/dyson.jl` can be edited.
+Read dyson.pdf for a general overview of the functionality, and use in-code docstrings for a detailed API guide.
 
 ## Figure index:
 

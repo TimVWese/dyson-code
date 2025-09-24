@@ -2,7 +2,7 @@
 This script recreates Figure 6, as found in the appendix.
 """
 
-include(joinpath(@__DIR__, "..", "dyson-setup.jl"))
+include(joinpath(@__DIR__, "..", "src", "dyson-setup.jl"))
 using Plots, LaTeXStrings
 
 """

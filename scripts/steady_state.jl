@@ -9,7 +9,7 @@ MIT License
 Copyright (c) 2025 Tim Van Wesemael, Gilberto Nakamura
 """
 
-include(joinpath(@__DIR__, "..", "dyson-setup.jl"))
+include(joinpath(@__DIR__, "..", "src", "dyson-setup.jl"))
 
 using LinearAlgebra
 using SparseArrays

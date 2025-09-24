@@ -1,0 +1,306 @@
+% Dyson-code: Tutorial and Reproducibility Notes
+\documentclass[11pt]{article}
+% Basic preamble for the Dyson SIS tutorial
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{fancyvrb}
+
+% Graphics
+\graphicspath{{../../results/figures/}}
+\newcommand{\maybeinclude}[2][]{% optional args + path
+  \IfFileExists{../../results/figures/#2}{\includegraphics[#1]{#2}}{\fbox{Missing figure: \texttt{\detokenize{#2}}}}%
+}
+
+
+% Convenience
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\pkg}[1]{\textsf{#1}}
+
+\title{Dyson SIS Code Tutorial and Reproducibility Notes}
+\author{Tim Van Wesemael, Gilberto Nakamura}
+\date{September 2025}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\bigskip
+
+\newpage
+
+\section{Overview}
+This document accompanies the \emph{dyson-code} repository and explains how to reproduce the figures and explore some model variations.
+The code implements a Susceptible-Infected-Susceptible (SIS) model on a graph and computes a Dyson similarity transformation that approximately symmetrizes the generator matrix.
+The primary entry points are in \code{src/dyson.jl} and runnable scripts in \code{scripts/} that generate the paper figures into \code{results/figures/}.
+
+\paragraph{Key components}
+\begin{itemize}
+  \item \code{default\_initialisation()} prepares a default complete graph with 6 nodes, default rates, and either loads or computes the Dyson transform.
+  \item \code{get\_SIS\_H(A, beta, gamma; incl\_disease\_free)} builds the SIS generator given adjacency matrix \code{A} and rates.
+  \item \code{find\_hermitian(H; tol, kmax)} iteratively constructs \(h,\eta\) with reduced asymmetry.
+  \item \code{simulate(H, eta; symmetrize, tspan, saveat)} integrates \( x'(t) = -H'x \) with opti-onal similarity transform.
+  \item Multiple functions to provide observables and statistics of the system.
+\end{itemize}
+
+\section{Quick start}
+\subsection{Prerequisites}
+\begin{itemize}
+  \item Julia 1.11.7 with the packages pinned by \code{Project.toml}
+\end{itemize}
+
+\subsection{Reproducing all figures}
+From the repository root:
+\begin{Verbatim}[fontsize=\small]
+$ bash run_all.sh
+\end{Verbatim}
+This runs every script in \code{scripts/} and writes figures to \code{results/figures/}.
+
+\section{Core API and Usage}
+\subsection{API Overview}
+The core functionality lives in \code{src/dyson.jl}.
+Below is a narrative overview of the exported functions used throughout the scripts, how to apply them in your own work, and when to prefer each.
+For a technical summary of arguments and return values, refer to the in-code documentation (docstrings) in \code{src/dyson.jl}.
+
+\paragraph{\code{default\_initialisation()}} Loads cached defaults or generates them if missing: a complete graph with six nodes, SIS generator \code{H}, Hermitized matrix \code{h}, transformation \(\eta\), rates \(\beta,\gamma\), a flag \code{incl\_disease\_free}, and the convergence \code{errors}.
+Use this at the top of a script to get a reproducible baseline without waiting for recomputation. Artifacts are cached under \code{results/intermediate/}.
+If you want to repeat the experiments for an other system (dynamics, or network), this function serves as a great jumping-off point.
+
+\begin{Verbatim}[fontsize=\small]
+name, g, A, H, h, eta, beta, gamma, incl_disease_free, errors = default_initialisation()
+\end{Verbatim}
+
+\paragraph{\code{get\_SIS\_H(A, beta, gamma; incl\_disease\_free=false)}} Constructs the SIS generator consistent with the chosen graph (represented by adjacency matrix \code{A}) and rates.
+Rows sum to zero by construction, and the disease-free state can be excluded, such that only a single steady-state exists.
+Use this when sweeping \(\beta/\gamma\) (see \code{scripts/transition.jl}) or when you want to try a different graph.
+
+\begin{Verbatim}[fontsize=\small]
+H = get_SIS_H(A, beta, gamma; incl_disease_free=false)
+\end{Verbatim}
+
+\paragraph{\code{find\_hermitian(H; tol, kmax, verbose=false)}} Iteratively finds a similarity transform that reduces the asymmetry of \code{H}, returning the transformed matrix \code{h}, the transform \(\eta\), and an error history.
+Use when you need a near-Hermitian representation for analysis or optimization (cf. \code{scripts/steady\_state.jl}).
+
+\begin{Verbatim}[fontsize=\small]
+h, eta, errors = find_hermitian(Matrix(H); kmax=5_000)
+\end{Verbatim}
+
+\paragraph{\code{SIS\_initial\_state(n)}} Provides the default initial state used in simulations: one infected individual mapped by \(\eta\).
+Override this if you need a different starting distribution (e.g., multiple infections or a distribution over states).
+
+\begin{Verbatim}[fontsize=\small]
+u0 = SIS_initial_state(size(H, 1))
+\end{Verbatim}
+
+\paragraph{\code{simulate(H, eta; symmetrize, tspan, saveat, initial\_func)}} Integrates the dynamics \(x'(t) = -H' x\) under the similarity transform \(\eta\).
+Set \code{symmetrize=true} to simulate the symmetrized transformed matrix.
+This changes the system depending on how non-Hermitian \code{H} is.
+However it ensures that the dynamics are reversible.
+Supply a custom \code{initial\_condition} to explore different initial states.
+
+\begin{Verbatim}[fontsize=\small]
+sol = simulate(H, I; tspan=(0.0, 5.0), saveat=0.05)       # original system
+sol_h = simulate(H, eta; symmetrize=true)                    # transformed
+sol_custom = simulate(H, eta; initial_condition=(H,eta)->(eta*rand(size(H,1))))
+\end{Verbatim}
+
+\paragraph{\code{get\_steady\_state(H; eta=I, symmetrize=false)}} Computes a steady state by forward integration.
+In the Hermitized frame, combine with \(\eta\) for the transformed steady state as in \code{scripts/steady\_state.jl}.
+
+\begin{Verbatim}[fontsize=\small]
+P_ss = get_steady_state(H)
+phi_ss = get_steady_state(h; symmetrize=false)  # pass eta via keyword in your code
+\end{Verbatim}
+
+\paragraph{\code{infectious\_proportion\_O(n; incl\_disease\_free=false)}} Returns the observable measuring the infected fraction.
+Use with \code{observe} on either the original state distribution \code{p} or the transformed state \(\phi\) with metric \(\Omega\).
+
+\begin{Verbatim}[fontsize=\small]
+  O = infectious_proportion_O(n; incl_disease_free=false)
+  I_mean = observe(O, p)
+  Omega = inv(eta*eta')
+  I_mean_transformed = observe(eta*O*inv(eta), phi, Omega)
+\end{Verbatim}
+
+\paragraph{\code{observe(O, p)} and \code{observe(O, phi, Omega)}} Two observation modes: apply \code{O} to the probability vector \code{p}, or to a transformed state \(\phi\) with the appropriate metric \(\Omega\).
+See \code{scripts/statistics.jl} for mean/variance time series in both frames.
+
+\paragraph{\code{shannon\_entropy(p)} and \code{renyi\_entropy(p)}} Entropy measures used for the entropy figures and transition curves. Apply directly to state vectors from simulations or steady states.
+For details (e.g., numerical safeguards near zeros), see the function docstrings.
+
+\subsection{Workflow}
+In practice, the workflow is: build or load \code{H}, obtain \(h,\eta\) via \code{find\_hermitian}, simulate either original or transformed dynamics using \code{simulate}, and compute observables with \code{observe} and entropies with \code{shannon\_entropy}/\code{renyi\_entropy}. For precise signatures and edge cases, consult the code documentation in \code{src/dyson.jl}.
+
+\section{Scripts and outputs}
+Each script starts by including \code{dyson-setup.jl}, which activates the project, brings \pkg{Dyson} into scope, seeds RNG for reproducibility, and ensures \code{results/figures/} exists.
+Every script is written to reproduce the figures of the paper, using the functionality of \pkg{Dyson}.
+
+\subsection{Matrix structure}
+  Script: \code{scripts/H\_figure.jl}
+  \begin{itemize}
+    \item Builds a color-coded visualization of the SIS generator's sparsity and transition types.
+    \item Saves \code{SIS\_H\_heatmap.pdf} to \code{results/figures/}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters (Figure~2B)}
+  \begin{itemize}
+    \item Color scaling and palette: edit the color ranges in the script for infections/healings/diagonals.
+    \item Graph size/structure: modify \code{default\_initialisation()} to change \code{complete\_graph(6)}.
+  \end{itemize}
+
+\subsection{Entropy figures (Figure~1)}
+  Script: \code{scripts/entropy\_figures.jl}
+  \begin{itemize}
+    \item \code{generate\_homotopy(eta, sim\_f, agg\_f; steps)} creates a homotopy \(\eta(\alpha)=(1-\alpha)I+\alpha\,\eta\) and aggregates an observable (by default R\'enyi entropy).
+    \item \code{create\_heatmap} saves \code{<name>\_entropy\_heatmap.pdf} and \code{create\_entropies\_figure} saves \code{<name>\_entropy\_graphs.pdf}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters}
+  \begin{itemize}
+    \item \code{sim\_f}: adjust to perform a homotopy over other systems than the SIS one.
+    \item \code{agg\_f}: change to aggregate other observables, e.g., \code{mean\_O} or \code{var\_O}.
+    \item \code{create\_entropies\_figure}: modify to plot other statistics or change figure layout.
+    \item \code{create\_heatmap}: change the look of the figure, e.g., colormap or axis limits.
+  \end{itemize}
+
+\subsection{Statistics over time (Figure~3)}
+  Script: \code{scripts/statistics.jl}
+  \begin{itemize}
+    \item Computes mean infection proportion and variance over time for original and transformed systems.
+    \item Saves \code{<name>\_statistics\_full.pdf}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters}
+  \begin{itemize}
+    \item \code{tspan}, \code{saveat}: change integration horizon and sampling density in \code{simulate} calls.
+    \item \code{symmetrize}: switch between raw and symmetrized dynamics in the transformed system.
+    \item Observable: replace \code{infectious\_proportion\_O} with other operators to track different quantities.
+  \end{itemize}
+
+\subsection{Transition curves (Figure~4)}
+  Script: \code{scripts/transition.jl}
+  \begin{itemize}
+    \item Sweeps ratios \(\beta/\gamma\) and records steady-state means, variances, and entropies (original and transformed).
+    \item Saves \code{<name>\_transition.pdf} and a JLD2 data file under \code{results/intermediate/}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters}
+  \begin{itemize}
+    \item \code{beta\_range}: adjust the logarithmic range of \(\beta/\gamma\) values.
+    \item \code{kmax}, \code{tol}: control depth/precision of \code{find\_hermitian} during the sweep.
+  \end{itemize}
+
+\subsection{Steady-state comparison (Figure~5)}
+  Script: \code{scripts/steady\_state.jl}
+  \begin{itemize}
+    \item Compares steady-states from Dyson-optimized distribution vs. dynamic evolution; annotates KS distance.
+    \item Saves multiple files like \code{<name>\_SIS\_ss\_b001.pdf}, \code{...\_b2.pdf}, \code{...\_b200.pdf}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters}
+  \begin{itemize}
+    \item Rates: set specific \(\beta\) values relative to \(\gamma\) to probe different regimes.
+    \item \code{kmax}: number of Hermitization iterations taken from \code{default\_initialisation()}.
+    \item Plot aesthetics: toggle legend, change colors, layout, and bar alignment.
+  \end{itemize}
+
+\subsection{Algorithm convergence (Figure~6)}
+  Script: \code{scripts/convergence.jl}
+  \begin{itemize}
+    \item Plots the error trajectory from \code{find\_hermitian} in log scale.
+    \item Saves \code{<name>\_convergence.pdf}.
+  \end{itemize}
+
+  \paragraph{Adjustable parameters}
+  \begin{itemize}
+    \item \code{kmax}: increase/decrease the number of iterations to control plot length.
+    \item Styling: modify line width, colors, and axis labels.
+  \end{itemize}
+
+\section{Figure Gallery}
+Below we embed the figures produced by the scripts. If a file is missing, a placeholder box appears.
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_entropy_heatmap.pdf}
+  \caption{Entropy heatmap (Figure 1).}
+  \label{fig:entropy_heatmap}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_entropy_graphs.pdf}
+  \caption{Entropy time series (Figure 1).}
+  \label{fig:entropy_graphs}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{SIS_H_heatmap.pdf}
+  \caption{Structure of the SIS generator (Figure 2B).}
+  \label{fig:H_heatmap}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_statistics_full.pdf}
+  \caption{Mean and standard deviation over time (Figure 3).}
+  \label{fig:statistics}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_transition.pdf}
+  \caption{Transition curves over \(\beta/\gamma\) (Figure 4).}
+  \label{fig:transition}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b001.pdf}
+  \caption{Steady-state comparison at low \(\beta\) (Figure 5 variant).}
+  \label{fig:ss_b001}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b2.pdf}
+  \caption{Steady-state comparison at intermediate \(\beta\) (Figure 5 variant).}
+  \label{fig:ss_b2}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b200.pdf}
+  \caption{Steady-state comparison at high \(\beta\) (Figure 5 variant).}
+  \label{fig:ss_b200}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \maybeinclude[width=.8\textwidth]{full-6-wodf_convergence.pdf}
+  \caption{Convergence of the Hermitization algorithm (Figure 6).}
+  \label{fig:convergence}
+\end{figure}
+
+\section{Produced Figures}
+The scripts in \code{scripts/} produce the following files in \code{results/figures/}:
+\begin{itemize}
+  \item \code{full-6-wodf\_entropy\_heatmap.pdf} --- Entropy heatmap (Figure~\ref{fig:entropy_heatmap}).
+  \item \code{full-6-wodf\_entropy\_graphs.pdf} --- Entropy time series (Figure~\ref{fig:entropy_graphs}).
+  \item \code{SIS\_H\_heatmap.pdf} --- Structure of the SIS generator (Figure~\ref{fig:H_heatmap}).
+  \item \code{full-6-wodf\_statistics\_full.pdf} --- Mean and standard deviation over time (Figure~\ref{fig:statistics}).
+  \item \code{full-6-wodf\_transition.pdf} --- Transition curves over \(\beta/\gamma\) (Figure~\ref{fig:transition}).
+  \item \code{full-6-wodf\_SIS\_ss\_b001.pdf} --- Steady-state bar plot at low \(\beta\) (Figure~\ref{fig:ss_b001}).
+  \item \code{full-6-wodf\_SIS\_ss\_b2.pdf} --- Steady-state bar plot at intermediate \(\beta\) (Figure~\ref{fig:ss_b2}).
+  \item \code{full-6-wodf\_SIS\_ss\_b200.pdf} --- Steady-state bar plot at high \(\beta\) (Figure~\ref{fig:ss_b200}).
+  \item \code{full-6-wodf\_convergence.pdf} --- Convergence of the Hermitization algorithm (Figure~\ref{fig:convergence}).
+\end{itemize}
+
+\end{document}
