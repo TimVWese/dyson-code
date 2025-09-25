@@ -14,9 +14,9 @@
 \usepackage{fancyvrb}
 
 % Graphics
-\graphicspath{{../../results/figures/}}
+\graphicspath{{../results/figures/}}
 \newcommand{\maybeinclude}[2][]{% optional args + path
-  \IfFileExists{../../results/figures/#2}{\includegraphics[#1]{#2}}{\fbox{Missing figure: \texttt{\detokenize{#2}}}}%
+  \IfFileExists{../results/figures/#2}{\includegraphics[#1]{#2}}{\fbox{Missing figure: \texttt{\detokenize{#2}}}}%
 }
 
 
@@ -71,6 +71,10 @@ For a technical summary of arguments and return values, refer to the in-code doc
 \paragraph{\code{default\_initialisation()}} Loads cached defaults or generates them if missing: a complete graph with six nodes, SIS generator \code{H}, Hermitized matrix \code{h}, transformation \(\eta\), rates \(\beta,\gamma\), a flag \code{incl\_disease\_free}, and the convergence \code{errors}.
 Use this at the top of a script to get a reproducible baseline without waiting for recomputation. Artifacts are cached under \code{results/intermediate/}.
 If you want to repeat the experiments for an other system (dynamics, or network), this function serves as a great jumping-off point.
+\paragraph{\code{disease\_free\_initialisation()}} Alternative initializer identical to \code{default\_initialisation()} but with the disease-free state included (\code{incl\_disease\_free=true}).
+This is useful for exploring regimes where the absorbing disease-free state meaningfully affects statistics or when you want to visualize transitions that cross the absorbing state.
+It caches its own intermediate file under a different name (\code{full-6-wdf}). Scripts such as \code{scripts/transition.jl} can adopt this initializer to produce \code{...\_transition.pdf} for the disease-free-inclusive model.
+
 
 \begin{Verbatim}[fontsize=\small]
 name, g, A, H, h, eta, beta, gamma, incl_disease_free, errors = default_initialisation()
@@ -256,7 +260,12 @@ Below we embed the figures produced by the scripts. If a file is missing, a plac
 
 \begin{figure}[h]
   \centering
-  \maybeinclude[width=.8\textwidth]{full-6-wodf_transition.pdf}
+  % Prefer disease-free variant if available, fall back to without-disease-free
+  \IfFileExists{../results/figures/full-6-wdf_transition.pdf}{%
+    \includegraphics[width=.8\textwidth]{full-6-wdf_transition.pdf}%
+  }{%
+    \maybeinclude[width=.8\textwidth]{full-6-wodf_transition.pdf}%
+  }
   \caption{Transition curves over \(\beta/\gamma\) (Figure 4).}
   \label{fig:transition}
 \end{figure}
@@ -264,21 +273,21 @@ Below we embed the figures produced by the scripts. If a file is missing, a plac
 \begin{figure}[h]
   \centering
   \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b001.pdf}
-  \caption{Steady-state comparison at low \(\beta\) (Figure 5 variant).}
+  \caption{Steady-state comparison at low \(\beta\) (Figure 5A).}
   \label{fig:ss_b001}
 \end{figure}
 
 \begin{figure}[h]
   \centering
   \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b2.pdf}
-  \caption{Steady-state comparison at intermediate \(\beta\) (Figure 5 variant).}
+  \caption{Steady-state comparison at intermediate \(\beta\) (Figure 5B).}
   \label{fig:ss_b2}
 \end{figure}
 
 \begin{figure}[h]
   \centering
   \maybeinclude[width=.8\textwidth]{full-6-wodf_SIS_ss_b200.pdf}
-  \caption{Steady-state comparison at high \(\beta\) (Figure 5 variant).}
+  \caption{Steady-state comparison at high \(\beta\) (Figure 5C).}
   \label{fig:ss_b200}
 \end{figure}
 
@@ -296,7 +305,7 @@ The scripts in \code{scripts/} produce the following files in \code{results/figu
   \item \code{full-6-wodf\_entropy\_graphs.pdf} --- Entropy time series (Figure~\ref{fig:entropy_graphs}).
   \item \code{SIS\_H\_heatmap.pdf} --- Structure of the SIS generator (Figure~\ref{fig:H_heatmap}).
   \item \code{full-6-wodf\_statistics\_full.pdf} --- Mean and standard deviation over time (Figure~\ref{fig:statistics}).
-  \item \code{full-6-wodf\_transition.pdf} --- Transition curves over \(\beta/\gamma\) (Figure~\ref{fig:transition}).
+  \item \code{full-6-wdf\_transition.pdf} (or \code{full-6-wodf\_transition.pdf} if excluding the disease-free state) --- Transition curves over \(\beta/\gamma\) (Figure~\ref{fig:transition}).
   \item \code{full-6-wodf\_SIS\_ss\_b001.pdf} --- Steady-state bar plot at low \(\beta\) (Figure~\ref{fig:ss_b001}).
   \item \code{full-6-wodf\_SIS\_ss\_b2.pdf} --- Steady-state bar plot at intermediate \(\beta\) (Figure~\ref{fig:ss_b2}).
   \item \code{full-6-wodf\_SIS\_ss\_b200.pdf} --- Steady-state bar plot at high \(\beta\) (Figure~\ref{fig:ss_b200}).

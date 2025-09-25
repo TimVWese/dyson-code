@@ -9,6 +9,7 @@ using Graphs
 using JLD2
 
 export default_initialisation
+export disease_free_initialisation
 export default_initial_condition
 export get_SIS_H
 export find_hermitian
@@ -40,7 +41,7 @@ function default_initialisation()
     else
         @info "No existing results found, generating new ones"
         n = 6
-        g = complete_graph(6)
+        g = complete_graph(n)
         A = adjacency_matrix(g)
 
         # Instantiate the dynamical system
@@ -48,6 +49,51 @@ function default_initialisation()
         γ = 0.05
 
         incl_disease_free = false
+        kmax = 50_000
+
+        # Construct H and find the Dyson similarity transformation
+        H = Matrix(Dyson.get_SIS_H(A, β, γ; incl_disease_free))
+        @assert maximum(abs.(imag.(eigvals(H)))) < 1e-8
+        h, η, errors = Dyson.find_hermitian(H; kmax, verbose=true)
+
+        # Store for future use
+        isdir(joinpath(@__DIR__, "..", "results", "intermediate")) || mkpath(joinpath(@__DIR__, "..", "results", "intermediate"))
+        @info "Saving results to $path"
+        JLD2.@save path g A H h η β γ incl_disease_free errors
+    end
+    @info "Final asymmetry: $(norm(h - h', 2))"
+    return name, g, A, H, h, η, β, γ, incl_disease_free, errors
+end
+
+"""
+    disease_free_initialisation()
+
+Load or generate default graph, system matrix, and Dyson transformation, as reported on in the manuscript:
+- Graph: Complete graph with 6 nodes
+- INCLUDING disease-free state
+- Infection rate β = 0.5
+- Healing rate γ = 0.05
+- 100,000 iterations of the Dyson optimization
+"""
+function disease_free_initialisation()
+    # Instantiate the considered graph (6 nodes, complete graph)
+    name = "full-6-wdf"
+
+    path = joinpath(@__DIR__, "..", "results", "intermediate", "$name.jld2")
+    if isfile(path)
+        @info "Loaded existing results from $path"
+        JLD2.@load path g A H h η β γ incl_disease_free errors
+    else
+        @info "No existing results found, generating new ones"
+        n = 6
+        g = complete_graph(n)
+        A = adjacency_matrix(g)
+
+        # Instantiate the dynamical system
+        β = 0.5
+        γ = 0.05
+
+        incl_disease_free = true
         kmax = 50_000
 
         # Construct H and find the Dyson similarity transformation
