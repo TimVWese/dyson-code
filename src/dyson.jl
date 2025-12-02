@@ -8,7 +8,9 @@ using Random
 using Graphs
 using JLD2
 
-export default_initialisation
+export full_initialisation
+export n6e9_initialisation
+export n6e10_initialisation
 export disease_free_initialisation
 export default_initial_condition
 export get_SIS_H
@@ -20,17 +22,31 @@ export observe
 export shannon_entropy
 export renyi_entropy
 
-"""
-    default_initialisation()
+function init_and_save(path, g, β, γ, incl_disease_free, kmax)
+    # Construct H and find the Dyson similarity transformation
+    A = adjacency_matrix(g)
+    H = Matrix(Dyson.get_SIS_H(A, β, γ; incl_disease_free))
+    @assert maximum(abs.(imag.(eigvals(H)))) < 1e-8
+    h, η, errors = Dyson.find_hermitian(H; kmax, verbose=true)
 
-Load or generate default graph, system matrix, and Dyson transformation, as reported on in the manuscript:
+    # Store for future use
+    isdir(dirname(path)) || mkpath(dirname(path))
+    @info "Saving results to $path"
+    JLD2.@save path g A H h η β γ incl_disease_free errors
+    return A, H, h, η, errors
+end
+
+"""
+    full_initialisation()
+
+Load or generate fulls graph, system matrix, and Dyson transformation, as reported on in the manuscript:
 - Graph: Complete graph with 6 nodes
 - No disease-free state
 - Infection rate β = 0.5
 - Healing rate γ = 0.05
 - 100,000 iterations of the Dyson optimization
 """
-function default_initialisation()
+function full_initialisation()
     # Instantiate the considered graph (6 nodes, complete graph)
     name = "full-6-wodf"
 
@@ -42,24 +58,74 @@ function default_initialisation()
         @info "No existing results found, generating new ones"
         n = 6
         g = complete_graph(n)
+
+        # Instantiate the dynamical system
+        β = 0.1
+        γ = 0.01
+
+        incl_disease_free = false
+        kmax = 50_000
+
+        A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
+    end
+    @info "Final asymmetry: $(norm(h - h', 2))"
+    return name, g, A, H, h, η, β, γ, incl_disease_free, errors
+end
+
+function n6e9_initialisation()
+    # Instantiate the considered graph (6 nodes, complete graph)
+    name = "n6e9-wodf"
+
+    path = joinpath(@__DIR__, "..", "results", "intermediate", "$name.jld2")
+    if isfile(path)
+        @info "Loaded existing results from $path"
+        JLD2.@load path g A H h η β γ incl_disease_free errors
+    else
+        @info "No existing results found, generating new ones"
+        g = Graph(Edge.([
+            1=>3, 1=>4, 1=>5,
+            1=>6, 2=>3, 2=>6,
+            3=>5, 3=>6, 4=>6,
+        ]))
         A = adjacency_matrix(g)
 
         # Instantiate the dynamical system
-        β = 0.5
+        β = 0.1
         γ = 0.05
 
         incl_disease_free = false
         kmax = 50_000
 
-        # Construct H and find the Dyson similarity transformation
-        H = Matrix(Dyson.get_SIS_H(A, β, γ; incl_disease_free))
-        @assert maximum(abs.(imag.(eigvals(H)))) < 1e-8
-        h, η, errors = Dyson.find_hermitian(H; kmax, verbose=true)
+        A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
+    end
+    @info "Final asymmetry: $(norm(h - h', 2))"
+    return name, g, A, H, h, η, β, γ, incl_disease_free, errors
+end
 
-        # Store for future use
-        isdir(joinpath(@__DIR__, "..", "results", "intermediate")) || mkpath(joinpath(@__DIR__, "..", "results", "intermediate"))
-        @info "Saving results to $path"
-        JLD2.@save path g A H h η β γ incl_disease_free errors
+function n6e10_initialisation()
+    # Instantiate the considered graph (6 nodes, complete graph)
+    name = "n6e10-wodf"
+
+    path = joinpath(@__DIR__, "..", "results", "intermediate", "$name.jld2")
+    if isfile(path)
+        @info "Loaded existing results from $path"
+        JLD2.@load path g A H h η β γ incl_disease_free errors
+    else
+        @info "No existing results found, generating new ones"
+        g = Graph(Edge.([
+            1=>2, 1=>3, 1=>4, 1=>5, 1=>6,
+            2=>3, 2=>6, 3=>5, 3=>6, 4=>6,
+        ]))
+        A = adjacency_matrix(g)
+
+        # Instantiate the dynamical system
+        β = 0.1
+        γ = 0.01
+
+        incl_disease_free = false
+        kmax = 50_000
+
+        A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
     end
     @info "Final asymmetry: $(norm(h - h', 2))"
     return name, g, A, H, h, η, β, γ, incl_disease_free, errors

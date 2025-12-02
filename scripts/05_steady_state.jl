@@ -121,7 +121,7 @@ function generate_ss_bar_plot(A, β, γ;
     return plot!(), result, Peq, H_ss, ϕ_on, h_ss
 end
 
-name, _, A, _, _, _, _, γ, incl_disease_free, errors = default_initialisation()
+name, _, A, _, _, _, _, γ, incl_disease_free, errors = n6e9_initialisation()
 kmax = length(errors)
 
 generate_ss_bar_plot(A, 1e-2 * γ, γ; kmax, incl_disease_free, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b001.pdf"), use_legend=:bottomright, bdg=L"10^{-2}")

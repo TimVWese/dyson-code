@@ -24,7 +24,7 @@ using LaTeXStrings
 Generate Figure 3 of the manuscript, showing the time evolution of the mean and standard deviation
 in the original and transformed systems.
 """
-function create_statistics_plot(H, η, γ;
+function create_statistics_plot(H, η, γ; sim_T=40., skips=30,
         incl_disease_free=true, m_colors=cgrad(:viridis)[10:180:end],
         plot_size=(450, 270), filename="statistics.pdf"
     )
@@ -42,8 +42,8 @@ function create_statistics_plot(H, η, γ;
     n = Int64(log2(N + (1 + incl_disease_free)))
     Ξ = ones(N, N)
 
-    Ps = Dyson.simulate(H, I; symmetrize=false, tspan=(0.0, 3.5), saveat=0.05)
-    ϕs = Dyson.simulate(H, η; symmetrize=true, tspan=(0.0, 3.5), saveat=0.05)
+    Ps = Dyson.simulate(H, I; symmetrize=false, tspan=(0.0, sim_T), saveat=0.05)
+    ϕs = Dyson.simulate(H, η; symmetrize=true, tspan=(0.0, sim_T), saveat=0.05)
 
     O_mean = infectious_proportion_O(n; incl_disease_free)
     O_sq = O_mean^2
@@ -65,7 +65,7 @@ function create_statistics_plot(H, η, γ;
     plot(; xlabel=L"$\gamma t$", ylabel="mean",size=plot_size, dpi=480)
     # Create plot with the mean values on the left y-axis
     plot!(Ps.t .* γ, Ipm, label=L"\langle \rho_I \rangle_P", color=m_colors[1], lw=2)
-    scatter!(Ps.t[1:4:end] .* γ, Ifm[1:4:end], label=L"\langle \rho_I \rangle_\phi", color=m_colors[1], marker=:circle, markersize=4)
+    scatter!(Ps.t[1:skips:end] .* γ, Ifm[1:skips:end], label=L"\langle \rho_I \rangle_\phi", color=m_colors[1], marker=:circle, markersize=4)
 
     plot!([],[]; label=L"\sigma_P", color=m_colors[2], lw=2)  # Dummy plot for legend spacing
     scatter!([], []; label=L"\sigma_\phi", color=m_colors[2], marker=:square)
@@ -73,12 +73,12 @@ function create_statistics_plot(H, η, γ;
 
     # Create a secondary y-axis on the right for standard deviations
     plot!(twinx(), Ps.t .* γ, sqrt.(Ipvar), label="", color=m_colors[2], ylabel=L"\sigma", lw=2)
-    scatter!(twinx(), Ps.t[1:4:end] .* γ, sqrt.(abs.(Ifvar[1:4:end])), label="", color=m_colors[2], marker=:square, markersize=4, yaxis=false)
+    scatter!(twinx(), Ps.t[1:skips:end] .* γ, sqrt.(abs.(Ifvar[1:skips:end])), label="", color=m_colors[2], marker=:square, markersize=4, yaxis=false)
 
     savefig(filename)
     return plot!()
 end
 
-name, _, _, H, _, η, _, γ, incl_disease_free, _ = default_initialisation()
+name, _, _, H, _, η, _, γ, incl_disease_free, _ = n6e9_initialisation()
 
 create_statistics_plot(H, η, γ; incl_disease_free, filename=joinpath(FIGURE_DIR, "$(name)_statistics_full.pdf"))

@@ -30,5 +30,5 @@ function create_convergence_plot(errors; m_colors=cgrad(:viridis)[10:180:end], p
     return p
 end
 
-name, _, _, _, _, _, _, _, _, errors = default_initialisation()
-create_convergence_plot(errors; filename=joinpath(FIGURE_DIR, "$(name)_convergence.pdf"))
+name, _, _, _, _, _, _, _, _, errors = n6e9_initialisation()
+create_convergence_plot(errors[1:3000]; filename=joinpath(FIGURE_DIR, "$(name)_convergence.pdf"))

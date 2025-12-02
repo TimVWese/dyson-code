@@ -16,7 +16,7 @@ using SparseArrays
 using Images
 
 
-_, g, A, H, _, _, _, _, incl_disease_free, _ = default_initialisation()
+name, g, A, H, _, _, _, _, incl_disease_free, _ = n6e9_initialisation()
 
 row_indices, col_indices, vals = Dyson.get_SIS_H_structure(A)
 
@@ -50,4 +50,4 @@ for i in axes(H, 1)
     H_img[i, i] = cs_diag[H[i,i]+1]
 end
 
-save(joinpath(FIGURE_DIR, "SIS_H_heatmap.pdf"), H_img)
+save(joinpath(FIGURE_DIR, "$(name)-SIS_H_heatmap.pdf"), H_img)

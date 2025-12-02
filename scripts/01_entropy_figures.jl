@@ -73,7 +73,7 @@ end
 Recreate Figure 1A.
 """
 function create_entropies_figure(H, η, sim_f, γ;
-        m_colors=cgrad(:viridis)[10:180:end], plot_size=(450, 270), filename="entropy-graphs.pdf")
+        m_colors=cgrad(:viridis)[10:180:end], plot_size=(450, 270), skips=30, filename="entropy-graphs.pdf")
     gr()  # GR backend supports custom fonts
 
     # Set Computer Modern font (assuming it's installed)
@@ -88,17 +88,17 @@ function create_entropies_figure(H, η, sim_f, γ;
 
     sol_o = sim_f(I)
     Plots.plot!(sol_o.t .* γ, Dyson.renyi_entropy.(sol_o.u), label="", color=m_colors[1])
-    Plots.scatter!(sol_o.t[1:6:end] .* γ, Dyson.renyi_entropy.(sol_o.u[1:6:end]), label="", color=m_colors[1], marker=:circle, markersize=4)
+    Plots.scatter!(sol_o.t[1:skips:end] .* γ, Dyson.renyi_entropy.(sol_o.u[1:skips:end]), label="", color=m_colors[1], marker=:circle, markersize=4)
     Plots.plot!([], [], label=L"$S_\mathrm{Renyi}(t)$", color=m_colors[1], marker=:circle, markersize=4)
 
     sol_o = sim_f(I)
     Plots.plot!(sol_o.t .* γ, Dyson.shannon_entropy.(sol_o.u), label="", color=m_colors[1], style=:dash)
-    Plots.scatter!(sol_o.t[1:6:end] .* γ, Dyson.shannon_entropy.(sol_o.u[1:6:end]), label="", color=m_colors[1], marker=:diamond, markersize=4)
+    Plots.scatter!(sol_o.t[1:skips:end] .* γ, Dyson.shannon_entropy.(sol_o.u[1:skips:end]), label="", color=m_colors[1], marker=:diamond, markersize=4)
     Plots.plot!([], [], label=L"$S_\mathrm{Shannon}(t)$", color=m_colors[1], marker=:diamond, markersize=4, style=:dash)
 
     sol_h = sim_f(η; symmetrize=true)
     Plots.plot!(sol_h.t .* γ, Dyson.renyi_entropy.(sol_h.u), label="", color=m_colors[2])
-    Plots.scatter!(sol_h.t[1:6:end] .* γ, Dyson.renyi_entropy.(sol_h.u[1:6:end]), label="", color=m_colors[2], marker=:square, markersize=4)
+    Plots.scatter!(sol_h.t[1:skips:end] .* γ, Dyson.renyi_entropy.(sol_h.u[1:skips:end]), label="", color=m_colors[2], marker=:square, markersize=4)
     Plots.plot!([], [], label=L"$S'_\mathrm{Renyi}(t)$", color=m_colors[2], marker=:square, markersize=4)
 
     savefig(filename)
@@ -106,10 +106,11 @@ function create_entropies_figure(H, η, sim_f, γ;
 end
 
 # Load data with default initialisation
-name, _, _, H, h, η, β, γ, _, _ = default_initialisation()
+name, _, _, H, h, η, β, γ, _, _ = n6e9_initialisation()
+T = 40.
 
-sim_f = (η; symmetrize=false) -> simulate(H, η; symmetrize=symmetrize, tspan=(0.0, 5.), saveat=0.05)
+sim_f = (η; symmetrize=false) -> simulate(H, η; symmetrize=symmetrize, tspan=(0.0, T), saveat=0.05)
 trajectories = generate_homotopy(η, sim_f, Dyson.renyi_entropy; steps=100)
 
-create_heatmap(trajectories; T_max = 0.25, filename=joinpath(FIGURE_DIR, "$(name)_entropy_heatmap.pdf"))
+create_heatmap(trajectories; T_max = T * γ, filename=joinpath(FIGURE_DIR, "$(name)_entropy_heatmap.pdf"))
 create_entropies_figure(H, η, sim_f, γ, filename=joinpath(FIGURE_DIR, "$(name)_entropy_graphs.pdf"))
