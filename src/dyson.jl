@@ -202,7 +202,7 @@ function get_rate_between(from::Integer, to::Integer, A::AbstractMatrix, β::T, 
         # Healing transition
         return γ
     else
-        # Infection transition, based on adjacency matrix A, with an extra rate for spontaneous infection
+        # Infection transition, based on adjacency matrix A
         return β * (dot(A[transition_bit, :], from))
     end
 end
@@ -219,7 +219,8 @@ function get_SIS_H_structure(A::AbstractMatrix)
     values = Int64[]
     for i in 1:2^size(A, 1)
         for j in 1:2^size(A, 1)
-            rate = get_rate_between(j, i, A, 1, -1)  # Example rates
+            # Negative -> healing, Positive -> infection (nb infected neighbours)
+            rate = get_rate_between(j, i, A, 1, -1)
             if rate != 0 || i == j
                 push!(row_indices, i)
                 push!(col_indices, j)
@@ -231,12 +232,12 @@ function get_SIS_H_structure(A::AbstractMatrix)
 end
 
 function get_SIS_H(row_indices, col_indices, values, β, γ; incl_disease_free=false)
-    f_val = x -> (x < 0)*γ + (x > 0)*x*β
+    f_val = x -> (x < 0)*γ + (x > 0)*x*β # convert structural rates to actual ones
     scaled_values = [f_val(v) for v in values]
     H_sparse = sparse(row_indices, col_indices, scaled_values)
     !incl_disease_free && (H_sparse = H_sparse[2:end, 2:end])
     for i in axes(H_sparse, 1)
-        H_sparse[i,i] = -sum(H_sparse[:,i])  # Ensure each row sums to zero
+        H_sparse[i,i] = -sum(H_sparse[:,i])  # Ensure each column sums to zero
     end
     return -H_sparse
 end
@@ -305,9 +306,9 @@ then finds the optimal similarity transformation to minimize the asymmetry.
 - `H::Matrix`: Input matrix to make more Hermitian
 
 # Returns
-- `Tuple{Float64, Float64, Matrix}`: 
+- `Tuple{Float64, Float64, Matrix}`:
   - `x`: Optimal transformation parameter found by optimization
-  - `asymmetry`: Residual asymmetry after transformation  
+  - `asymmetry`: Residual asymmetry after transformation
   - `h`: Transformed matrix after applying optimal similarity transformation
 
 # Algorithm
@@ -334,7 +335,7 @@ end
 
 Iteratively transform a matrix to make it as Hermitian as possible.
 
-This function repeatedly applies similarity transformations to reduce the 
+This function repeatedly applies similarity transformations to reduce the
 asymmetry of the input matrix. The algorithm stops when either the asymmetry
 falls below the tolerance or the maximum number of iterations is reached.
 

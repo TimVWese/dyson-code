@@ -1,5 +1,3 @@
-exit()
-
 using Random
 using Graphs
 using LinearAlgebra
@@ -67,9 +65,7 @@ function is_isomorphic(G1::Graph, G2::Graph; permutations=nothing)
     A2 = adjacency_matrix(G2)
     for P in permutations
         A1_perm = P * A1 * transpose(P)
-        if A1_perm == A2
-            return true
-        end
+        (A1_perm == A2) && return true
     end
     return false
 end
