@@ -58,6 +58,7 @@ function create_heatmap(trajectories, ; T_max=1.25, plot_size=(450, 270), filena
         ylabel=L"$\alpha$",
         title=L"$S_{\mathrm{Rényi}}$",
         size=plot_size,
+        right_margin=10Plots.mm,
         dpi=480,
         framestyle=:box
     )
