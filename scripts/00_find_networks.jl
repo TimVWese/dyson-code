@@ -73,7 +73,7 @@ end
 """
     find_networks(n; nb_to_find=nothing, max_attempts=nothing, β=0.1, γ=0.05)
 """
-function find_networks(n; nb_to_find=nothing, max_attempts=nothing, β=0.1, γ=0.05)
+function find_networks(n; nb_to_find=nothing, max_attempts=nothing, β=1, γ=1, incl_disease_free=false)
     found_networks = Graph[]
     max_networks = 2^(n * (n - 1) ÷ 2) # Maximum number of graphs
     nb_to_find = isnothing(nb_to_find) ? max_networks : nb_to_find
@@ -87,7 +87,7 @@ function find_networks(n; nb_to_find=nothing, max_attempts=nothing, β=0.1, γ=0
         if any(is_isomorphic(network, existing; permutations=permutations) for existing in found_networks)
             continue
         end
-        H = get_SIS_H(adjacency_matrix(network), β, γ)
+        H = get_SIS_H(adjacency_matrix(network), β, γ; incl_disease_free)
         eigs = eigvals(Matrix(H))
         if all(imag.(eigs) .<= sqrt(eps()))  # Check for real eigenvalues
             push!(found_networks, network)

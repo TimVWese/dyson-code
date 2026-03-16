@@ -19,7 +19,7 @@ using ProgressMeter
 using JLD2
 using Plots, LaTeXStrings
 
-function generate_transition_data(A; γ=5e-2, β_range=(-0.8:0.005:1.5), tol=1e-6, kmax=5000, incl_disease_free=true)
+function generate_transition_data(A, incl_disease_free; γ=5e-2, β_range=(-0.8:0.005:1.5), tol=1e-6, kmax=50)
     n = size(A, 1)
     N = 2^n - (1 - incl_disease_free)
 
@@ -28,14 +28,12 @@ function generate_transition_data(A; γ=5e-2, β_range=(-0.8:0.005:1.5), tol=1e-
     O_msq = O_mean .^ 2
     βs = γ * 10 .^ β_range
 
-    valid = [maximum(abs.(imag.(eigvals(Matrix(Dyson.get_SIS_H(A, β, γ)))))) < 1e-8 for β in βs]
-    @info "$(count(valid)) of $(length(βs)) β values have real eigenvalues"
-
     ratios = βs ./ γ
-    undef_array = () -> zeros(Float64, length(βs))
+    undef_array = () -> fill(NaN, length(βs))
     props = undef_array()
     entropies = undef_array()
     vars = undef_array()
+    realized = fill(0., length(βs))
 
     ϕ_entropies = undef_array()
     ηs = [zeros(Float64, N, N) for _ in βs]
@@ -43,19 +41,28 @@ function generate_transition_data(A; γ=5e-2, β_range=(-0.8:0.005:1.5), tol=1e-
     pb = Progress(length(βs))
     Threads.@threads for i in eachindex(βs)
         β = βs[i]
+        H = Dyson.get_SIS_H(row_indices, col_indices, values, β, γ; incl_disease_free)
 
-        H = get_SIS_H(row_indices, col_indices, values, β, γ; incl_disease_free)
-        p = get_steady_state(H)
-        props[i] = observe(O_mean, p)
-        entropies[i] = renyi_entropy(p)
-        I_sq = observe(O_msq, p)
+        if maximum(abs.(imag.(eigvals(Matrix(H))))) > 1e-8
+            try 
+                new_H = realize_matrix(H)
+                realized[i] = norm(Matrix(H) - new_H)
+                H = new_H
+            catch e
+                @warn "Failed to realize matrix for β = $β: $(e)"
+                continue
+            end
+        end
+
+        p = Dyson.get_steady_state(H)
+        props[i] = Dyson.observe(O_mean, p)
+        entropies[i] = Dyson.renyi_entropy(p)
+        I_sq = Dyson.observe(O_msq, p)
         vars[i] = I_sq - props[i]^2
-
-        @assert maximum(abs.(imag.(eigvals(Matrix(H))))) < 1e-8 "Hermitian matrix has non-zero imaginary eigenvalues: $H"
         try
-            h, η, _ = find_hermitian(Matrix(H); tol, kmax)
-            ϕ = get_steady_state(h; η=η, symmetrize=false)
-            ϕ_entropies[i] = renyi_entropy(ϕ)
+            h, η, _ = Dyson.find_hermitian(Matrix(H); tol, kmax)
+            ϕ = Dyson.get_steady_state(h; η=η, symmetrize=false)
+            ϕ_entropies[i] = Dyson.renyi_entropy(ϕ)
             ηs[i] .= η
         catch e
             @warn "Failed to find hermitian matrix for β = $β: $(e)"
@@ -65,7 +72,7 @@ function generate_transition_data(A; γ=5e-2, β_range=(-0.8:0.005:1.5), tol=1e-
     end
 
     # Save the results
-    return ratios, props, entropies, vars, ϕ_entropies, ηs
+    return ratios, props, entropies, vars, ϕ_entropies, ηs, realized
 end
 
 function plot_transition_data(ratios, props, entropies, vars, ϕ_entropies;
@@ -115,15 +122,12 @@ function plot_transition_data(ratios, props, entropies, vars, ϕ_entropies;
 end
 
 # Produce both a transition plot including and excluding the disease-free state
-for init in (default_initialisation, disease_free_initialisation)
-    name, _, A, _, _, _, _, γ, incl_disease_free, errors = init()
-    kmax = length(errors)
+name, _, A, _, _, _, _, γ, incl_disease_free, errors = Dyson.n6e9_initialisation()
 
-    ratios, props, entropies, vars, ϕ_entropies, ηs = generate_transition_data(A; γ, β_range=(-2.1:0.0125:1.8), kmax, incl_disease_free)
-    output_file = joinpath(@__DIR__, "..", "results", "intermediate", "transition_points_" * name * ".jld2")
-    JLD2.@save output_file ratios props entropies vars ϕ_entropies ηs
-    JLD2.@load output_file ratios props entropies vars ϕ_entropies ηs
-    plot_transition_data(ratios, props, entropies, vars, ϕ_entropies;
-                         marker_step=12, plot_size=(450, 270), output_file=joinpath(FIGURE_DIR, "$(name)_transition.pdf"))
-end
+ratios, props, entropies, vars, ϕ_entropies, ηs, realized = generate_transition_data(A, incl_disease_free; γ, β_range=(-2.1:0.0125:1.8))
+output_file = joinpath(@__DIR__, "..", "results", "intermediate", "transition_points_" * name * ".jld2")
+JLD2.@save output_file ratios props entropies vars ϕ_entropies ηs realized
+JLD2.@load output_file ratios props entropies vars ϕ_entropies ηs realized
+plot_transition_data(ratios, props, entropies, vars, ϕ_entropies;
+                    marker_step=12, plot_size=(450, 270), output_file=joinpath(FIGURE_DIR, "$(name)_transition.pdf"))
 

@@ -34,18 +34,19 @@ function add_KS_annotation!(p, Peq, H_ss)
 end
 
 """
-    generate_ss_bar_plot(A, β, γ; tol=1e-5, kmax=5000, incl_disease_free=true,
-        filename="ss_bar_plot.pdf", m_colors=cgrad(:viridis)[10:180:end],
-        plot_size=(450, 270), use_legend=false, bdg=nothing)
+    generate_ss_bar_plot(A, β, γ, incl_disease_free;
+        tol=1e-5, kmax=500, filename="ss_bar_plot.pdf",
+        m_colors=cgrad(:viridis)[10:180:end], plot_size=(450, 270),
+        use_legend=false, bdg=nothing)
 
 Generate a bar plot comparing the steady state obtained by optimizing the Dyson transformation
 and by dynamically evolving the system. Also returns the steady states and the optimization result.
 Results are in Figure 5.
 """
-function generate_ss_bar_plot(A, β, γ;
-        tol=1e-5, kmax=5000, incl_disease_free=true,
-        filename="ss_bar_plot.pdf", m_colors=cgrad(:viridis)[10:180:end],
-        plot_size=(450, 270), use_legend=false, bdg=nothing,
+function generate_ss_bar_plot(A, β, γ, incl_disease_free;
+        tol=1e-5, kmax=500, filename="ss_bar_plot.pdf",
+        m_colors=cgrad(:viridis)[10:180:end], plot_size=(450, 270),
+        use_legend=false, bdg=nothing,
     )
 
     gr()  # GR backend supports custom fonts
@@ -59,6 +60,7 @@ function generate_ss_bar_plot(A, β, γ;
     )
 
     H = Dyson.get_SIS_H(A, β, γ; incl_disease_free)
+    H = Dyson.realize_matrix(H)
     h, η, _ = Dyson.find_hermitian(Matrix(H); kmax)
     iη = inv(η)
 
@@ -124,6 +126,6 @@ end
 name, _, A, _, _, _, _, γ, incl_disease_free, errors = n6e9_initialisation()
 kmax = length(errors)
 
-generate_ss_bar_plot(A, 1e-2 * γ, γ; kmax, incl_disease_free, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b001.pdf"), use_legend=:bottomright, bdg=L"10^{-2}")
-generate_ss_bar_plot(A, 10^-.5 * γ, γ; kmax, incl_disease_free, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b2.pdf"), bdg=L"10^{-0.5}")
-generate_ss_bar_plot(A, 2e1 * γ, γ; kmax, incl_disease_free, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b200.pdf"), bdg=L"20")
+generate_ss_bar_plot(A, 1e-2 * γ, γ, incl_disease_free; kmax,  filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b001.pdf"), use_legend=:bottomright, bdg=L"10^{-2}")
+generate_ss_bar_plot(A, 10^-.5 * γ, γ, incl_disease_free; kmax, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b2.pdf"), bdg=L"10^{-0.5}")
+generate_ss_bar_plot(A, 2e1 * γ, γ, incl_disease_free; kmax, filename=joinpath(FIGURE_DIR, "$(name)_SIS_ss_b200.pdf"), bdg=L"20")

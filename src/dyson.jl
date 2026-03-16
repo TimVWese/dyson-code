@@ -15,6 +15,7 @@ export disease_free_initialisation
 export default_initial_condition
 export get_SIS_H
 export find_hermitian
+export realize_matrix
 export simulate
 export get_steady_state
 export infectious_proportion_O
@@ -26,7 +27,6 @@ function init_and_save(path, g, β, γ, incl_disease_free, kmax)
     # Construct H and find the Dyson similarity transformation
     A = adjacency_matrix(g)
     H = Matrix(Dyson.get_SIS_H(A, β, γ; incl_disease_free))
-    @assert maximum(abs.(imag.(eigvals(H)))) < 1e-8
     h, η, errors = Dyson.find_hermitian(H; kmax, verbose=true)
 
     # Store for future use
@@ -64,7 +64,7 @@ function full_initialisation()
         γ = 0.01
 
         incl_disease_free = false
-        kmax = 50_000
+        kmax = 5000
 
         A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
     end
@@ -94,36 +94,7 @@ function n6e9_initialisation()
         γ = 0.05
 
         incl_disease_free = false
-        kmax = 50_000
-
-        A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
-    end
-    @info "Final asymmetry: $(norm(h - h', 2))"
-    return name, g, A, H, h, η, β, γ, incl_disease_free, errors
-end
-
-function n6e10_initialisation()
-    # Instantiate the considered graph (6 nodes, complete graph)
-    name = "n6e10-wodf"
-
-    path = joinpath(@__DIR__, "..", "results", "intermediate", "$name.jld2")
-    if isfile(path)
-        @info "Loaded existing results from $path"
-        JLD2.@load path g A H h η β γ incl_disease_free errors
-    else
-        @info "No existing results found, generating new ones"
-        g = Graph(Edge.([
-            1=>2, 1=>3, 1=>4, 1=>5, 1=>6,
-            2=>3, 2=>6, 3=>5, 3=>6, 4=>6,
-        ]))
-        A = adjacency_matrix(g)
-
-        # Instantiate the dynamical system
-        β = 0.1
-        γ = 0.01
-
-        incl_disease_free = false
-        kmax = 50_000
+        kmax = 5000
 
         A, H, h, η, errors = init_and_save(path, g, β, γ, incl_disease_free, kmax)
     end
@@ -160,7 +131,7 @@ function disease_free_initialisation()
         γ = 0.05
 
         incl_disease_free = true
-        kmax = 50_000
+        kmax = 5000
 
         # Construct H and find the Dyson similarity transformation
         H = Matrix(Dyson.get_SIS_H(A, β, γ; incl_disease_free))
@@ -189,7 +160,7 @@ end
 
 Compute the transition rate between two states in a SIS model.
 """
-function get_rate_between(from::Integer, to::Integer, A::AbstractMatrix, β::T, γ::T)::T where T<:Real
+function get_rate_between(from::Integer, to::Integer, A::AbstractMatrix, β::T, γ::T) where T<:Real
     from = int2state(from, size(A, 1))
     to = int2state(to, size(A, 1))
     # Only have a transition in one bit
@@ -216,11 +187,11 @@ Returns the row indices, column indices, and values for the non-zero entries of 
 function get_SIS_H_structure(A::AbstractMatrix)
     row_indices = Int64[]
     col_indices = Int64[]
-    values = Int64[]
+    values = Real[]
     for i in 1:2^size(A, 1)
         for j in 1:2^size(A, 1)
             # Negative -> healing, Positive -> infection (nb infected neighbours)
-            rate = get_rate_between(j, i, A, 1, -1)
+            rate = get_rate_between(j, i, A, 1., -1.)
             if rate != 0 || i == j
                 push!(row_indices, i)
                 push!(col_indices, j)
@@ -372,6 +343,19 @@ function find_hermitian(H ; tol = 1e-8, kmax = 2500, verbose=false)
         k = k+1
     end
     return h, η, errors[1:k-1]
+end
+
+"""
+    realize_matrix(A::AbstarctMatrix)
+
+Get rid of the imaginary part of the eigenvalues of A
+"""
+function realize_matrix(A::AbstractMatrix)::Matrix{Float64}
+    vals, vecs = eigen(Matrix(A))
+    vals_real = real.(vals)
+    new = vecs * Diagonal(vals_real) * inv(vecs)
+    (maximum(abs.(imag.(new))) > 1e-8) && @warn "Realized matrix has significant imaginary part: max imag = $(maximum(abs.(imag.(new))))"
+    return real.(new)
 end
 
 """
